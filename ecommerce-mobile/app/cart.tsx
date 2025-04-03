@@ -2,88 +2,48 @@ import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
 import { Text } from '@/components/ui/text';
 import { useCart } from '@/store/cartStore';
-import { View, FlatList, Alert } from 'react-native';
+import { FlatList, Alert } from 'react-native';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Redirect, useRouter } from 'expo-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { createOrder } from '@/api/orders';
-import { createPaymentIntent } from '@/api/stripe';
-import { useEffect } from 'react';
-import { useStripe } from '@stripe/stripe-react-native';
+import { useAuth } from '@/store/authStore';
 
 export default function CartScreen() {
-  const items = useCart((state) => state.items);
-  const resetCart = useCart((state) => state.resetCart);
-
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
-
-  const paymentIntentMutation = useMutation({
-    mutationFn: createPaymentIntent,
-    onSuccess: async (data) => {
-      const { customer, ephemeralKey, paymentIntent } = data;
-
-      const { error } = await initPaymentSheet({
-        merchantDisplayName: 'Example, Inc.',
-        customerId: customer,
-        customerEphemeralKeySecret: ephemeralKey,
-        paymentIntentClientSecret: paymentIntent,
-        // Set `allowsDelayedPaymentMethods` to true if your business can handle payment
-        //methods that complete payment after a delay, like SEPA Debit and Sofort.
-        // allowsDelayedPaymentMethods: true,
-        defaultBillingDetails: {
-          name: 'Jane Doe',
-        },
-        // returnURL: 'notjust-ecom:/',
-      });
-      if (error) {
-        Alert.alert('Error', error.message);
-        console.log(error);
-      }
-
-      openPaymentSheet();
-    },
-    onError: (error) => {
-      console.log(error);
-    },
-  });
-
+  const items = useCart((state: any) => state.items);
+  const resetCart = useCart((state: any) => state.resetCart);
   const router = useRouter();
+  const isLoggedIn = useAuth((state: any) => !!state.token);
 
   const createOrderMutation = useMutation({
     mutationFn: () =>
       createOrder(
-        items.map((item) => ({
+        items.map((item: any) => ({
           productId: item.product.id,
           quantity: item.quantity,
           price: item.product.price, // MANAGE FORM SERVER SIDE
         }))
       ),
-    onSuccess: (data) => {
-      paymentIntentMutation.mutate({ orderId: data.id });
+    onSuccess: (_data) => {
+      Alert.alert('Success', 'Your order is confirmed! We will deliver it to your address.');
+      resetCart();
+      router.replace('/');
     },
     onError: (error) => {
       console.log(error);
+      Alert.alert('Error', 'There was an error processing your order. Please try again.');
     },
   });
 
-  const openPaymentSheet = async () => {
-    const { error } = await presentPaymentSheet();
-
-    if (error) {
-      Alert.alert(`Error code: ${error.code}`, error.message);
-      // TODO: handle error. The order is submitted, but payment failed.
-    } else {
-      Alert.alert('Success', 'Your order is confirmed!');
-      resetCart();
-      // router.push(`/orders/${orderId}`);
-      router.replace('/');
-    }
-  };
-
   const onCheckout = async () => {
+    if (!isLoggedIn) {
+      Alert.alert('Login Required', 'Please log in to complete your order.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => router.push('/login') }
+      ]);
+      return;
+    }
     createOrderMutation.mutateAsync();
-
-    // openPaymentSheet();
   };
 
   if (items.length === 0) {

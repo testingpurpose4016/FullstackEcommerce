@@ -19,7 +19,7 @@ export const ordersTable = pgTable('orders', {
     .references(() => usersTable.id)
     .notNull(),
 
-  stripePaymentIntentId: varchar({ length: 255 }),
+  paymentMethod: varchar({ length: 50 }).notNull().default('cash_on_delivery'),
 });
 
 export const orderItemsTable = pgTable('order_items', {
@@ -48,7 +48,7 @@ export const insertOrderItemSchema = createInsertSchema(orderItemsTable).omit({
 });
 
 export const insertOrderWithItemsSchema = z.object({
-  order: insertOrderSchema,
+  order: insertOrderSchema.optional(),
   items: z.array(insertOrderItemSchema),
 });
 
