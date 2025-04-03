@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 
 export async function createOrder(req: Request, res: Response) {
   try {
-    const { items } = req.cleanBody;
+    const { items, order } = req.cleanBody;
 
     const userId = req.userId;
     console.log(userId);
@@ -14,10 +14,24 @@ export async function createOrder(req: Request, res: Response) {
       return;
     }
 
+    // Extract order data including delivery information
+    // Store delivery info in a separate variable to log it
+    const deliveryInfo = order?.deliveryInfo || null;
+    console.log('Delivery Info:', deliveryInfo);
+
+    // Only include fields that exist in the database schema
+    const orderData = {
+      userId: userId,
+      paymentMethod: order?.paymentMethod || 'cash_on_delivery',
+      // Only include deliveryInfo if it's supported by the database
+      // If migration hasn't been applied, this will be ignored
+      ...(deliveryInfo ? { deliveryInfo } : {})
+    };
+
     const [newOrder] = await db
       .insert(ordersTable)
       // @ts-ignore
-      .values({ userId: userId, paymentMethod: 'cash_on_delivery' })
+      .values(orderData)
       .returning();
 
     // TODO: validate products ids, and take their actual price from db
@@ -40,6 +54,7 @@ export async function createOrder(req: Request, res: Response) {
       status: 'New',
       userId: req.userId || 1,
       paymentMethod: 'cash_on_delivery',
+      deliveryInfo: req.cleanBody.order?.deliveryInfo || null,
       items: req.cleanBody.items.map((item: any, index: number) => ({
         id: index + 1,
         orderId: 1,

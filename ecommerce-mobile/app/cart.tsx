@@ -5,35 +5,12 @@ import { useCart } from '@/store/cartStore';
 import { FlatList, Alert } from 'react-native';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Redirect, useRouter } from 'expo-router';
-import { useMutation } from '@tanstack/react-query';
-import { createOrder } from '@/api/orders';
 import { useAuth } from '@/store/authStore';
 
 export default function CartScreen() {
   const items = useCart((state: any) => state.items);
-  const resetCart = useCart((state: any) => state.resetCart);
   const router = useRouter();
   const isLoggedIn = useAuth((state: any) => !!state.token);
-
-  const createOrderMutation = useMutation({
-    mutationFn: () =>
-      createOrder(
-        items.map((item: any) => ({
-          productId: item.product.id,
-          quantity: item.quantity,
-          price: item.product.price, // MANAGE FORM SERVER SIDE
-        }))
-      ),
-    onSuccess: (_data) => {
-      Alert.alert('Success', 'Your order is confirmed! We will deliver it to your address.');
-      resetCart();
-      router.replace('/');
-    },
-    onError: (error) => {
-      console.log(error);
-      Alert.alert('Error', 'There was an error processing your order. Please try again.');
-    },
-  });
 
   const onCheckout = async () => {
     if (!isLoggedIn) {
@@ -43,31 +20,63 @@ export default function CartScreen() {
       ]);
       return;
     }
-    createOrderMutation.mutateAsync();
+    // Navigate to checkout screen instead of creating order directly
+    router.push('/checkout');
   };
 
   if (items.length === 0) {
     return <Redirect href={'/'} />;
   }
 
+  // Calculate total price
+  const totalPrice = items.reduce(
+    (sum: number, item: any) => sum + item.product.price * item.quantity,
+    0
+  );
+
   return (
-    <FlatList
-      data={items}
-      contentContainerClassName="gap-2 max-w-[960px] w-full mx-auto p-2"
-      renderItem={({ item }) => (
-        <HStack className="bg-white p-3">
-          <VStack space="sm">
-            <Text bold>{item.product.name}</Text>
-            <Text>$ {item.product.price}</Text>
-          </VStack>
-          <Text className="ml-auto">{item.quantity}</Text>
+    <VStack className="flex-1 bg-background-50 p-4">
+      <Text className="text-xl font-bold mb-4">Your Cart</Text>
+
+      <FlatList
+        data={items}
+        className="flex-1"
+        contentContainerClassName="gap-2"
+        renderItem={({ item }) => (
+          <HStack className="bg-white p-4 rounded-lg mb-2 items-center">
+            <VStack space="sm" className="flex-1">
+              <Text bold className="truncate">{item.product.name}</Text>
+              <Text>${item.product.price.toFixed(2)}</Text>
+            </VStack>
+            <HStack className="items-center">
+              <Text className="text-typography-500 mr-2">Qty: {item.quantity}</Text>
+            </HStack>
+          </HStack>
+        )}
+      />
+
+      {/* Order Summary */}
+      <VStack className="bg-white p-4 rounded-lg mt-4 mb-4">
+        <HStack className="justify-between mb-2">
+          <Text>Subtotal</Text>
+          <Text>${totalPrice.toFixed(2)}</Text>
         </HStack>
-      )}
-      ListFooterComponent={() => (
-        <Button onPress={onCheckout}>
-          <ButtonText>Checkout</ButtonText>
-        </Button>
-      )}
-    />
+        <HStack className="justify-between mb-2">
+          <Text>Shipping</Text>
+          <Text>$5.99</Text>
+        </HStack>
+        <HStack className="justify-between pt-2 border-t border-gray-200 mt-2">
+          <Text className="font-bold">Total</Text>
+          <Text className="font-bold">${(totalPrice + 5.99).toFixed(2)}</Text>
+        </HStack>
+      </VStack>
+
+      <Button
+        onPress={onCheckout}
+        className="w-full"
+      >
+        <ButtonText>Proceed to Checkout</ButtonText>
+      </Button>
+    </VStack>
   );
 }

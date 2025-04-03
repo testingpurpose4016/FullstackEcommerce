@@ -4,6 +4,7 @@ import {
   pgTable,
   timestamp,
   varchar,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { usersTable } from './usersSchema.js';
 import { productsTable } from './productsSchema.js';
@@ -20,6 +21,9 @@ export const ordersTable = pgTable('orders', {
     .notNull(),
 
   paymentMethod: varchar({ length: 50 }).notNull().default('cash_on_delivery'),
+
+  // Store delivery information as JSON
+  deliveryInfo: jsonb(),
 });
 
 export const orderItemsTable = pgTable('order_items', {
@@ -35,12 +39,26 @@ export const orderItemsTable = pgTable('order_items', {
   price: doublePrecision().notNull(),
 });
 
-export const insertOrderSchema = createInsertSchema(ordersTable).omit({
-  id: true,
-  userId: true,
-  status: true,
-  createdAt: true,
+// Define a schema for delivery information
+const deliveryInfoSchema = z.object({
+  name: z.string(),
+  address: z.string(),
+  city: z.string(),
+  zipCode: z.string(),
+  phone: z.string(),
+  notes: z.string().optional(),
 });
+
+export const insertOrderSchema = createInsertSchema(ordersTable)
+  .omit({
+    id: true,
+    userId: true,
+    status: true,
+    createdAt: true,
+  })
+  .extend({
+    deliveryInfo: deliveryInfoSchema.optional(),
+  });
 
 export const insertOrderItemSchema = createInsertSchema(orderItemsTable).omit({
   id: true,
